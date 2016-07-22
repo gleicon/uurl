@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 )
@@ -37,7 +36,7 @@ func (hr *HTTPResources) URLApiHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		uid := appendix[1:]
-		log.Println(uid)
+
 		if redirURL, err = hr.uu.GetURLByUID(uid); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -46,6 +45,13 @@ func (hr *HTTPResources) URLApiHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
+
+		ref := r.Header.Get("REFERER")
+		if err = hr.uu.UpdateEncodedURLData(uid, r.RemoteAddr, ref); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		http.Redirect(w, r, redirURL, http.StatusSeeOther)
 		return
 		break
@@ -83,7 +89,7 @@ func (hr *HTTPResources) URLApiHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// '{"uurl":"%s", "url": "%s", "base_url": "%s"}' % (uurl, url, BASE_URL)
-		fmt.Fprintf(w, "{\"uurl\":\"%s\", \"url\": \"%s\", \"base_url\": \"%s\"}", uid, oUrl, r.Header.Get("HOST"))
+		fmt.Fprintf(w, "{\"uurl\":\"%s\", \"url\": \"%s\", \"base_url\": \"%s\"}\n", uid, oUrl, r.Header.Get("HOST"))
 		return
 		break
 	}
