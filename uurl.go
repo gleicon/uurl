@@ -86,10 +86,16 @@ func (uu *UURL) GetUUID() (int, error) {
 	return u, e
 }
 
-func (uu *UURL) GetURLByUID(uid string) (string, error) {
+func (uu *UURL) GetURLByUID(uid, ip, ref string) (string, error) {
+	var err error
+	var url string
+
 	k := fmt.Sprintf(ENCODED_URL_MASK, uid)
-	url, err := uu.db.Get(k)
-	if err != nil {
+
+	if url, err = uu.db.Get(k); err != nil {
+		return "", err
+	}
+	if err = uu.UpdateEncodedURLData(uid, ip, ref); err != nil {
 		return "", err
 	}
 	return url, nil

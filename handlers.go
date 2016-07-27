@@ -4,21 +4,57 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
 )
 
 type HTTPResources struct {
-	uu        *UURL
-	serverMux *http.ServeMux
+	uu                *UURL
+	serverMux         *http.ServeMux
+	staticFileHandler *http.Handler
 }
 
-func NewHTTPResources(uu *UURL) *HTTPResources {
+func NewHTTPResources(uu *UURL, staticFiles string) *HTTPResources {
 	sm := http.NewServeMux()
-	hr := HTTPResources{uu: uu, serverMux: sm}
+	sf := http.FileServer(http.Dir(staticFiles))
+	hr := HTTPResources{uu: uu, serverMux: sm, staticFileHandler: &sf}
+
+	hr.serverMux.HandleFunc("/", hr.RootHandler)
 	hr.serverMux.HandleFunc("/api/v1/url", hr.URLApiHandler)
 	hr.serverMux.HandleFunc("/api/v1/url/", hr.URLApiHandler)
 	hr.serverMux.HandleFunc("/api/v1/quicklink", hr.QuickLinkHandler)
 	hr.serverMux.HandleFunc("/api/v1/stats/", hr.StatsHandler)
 	return &hr
+}
+
+func (hr *HTTPResources) RootHandler(w http.ResponseWriter, r *http.Request) {
+	var redirURL string
+	var err error
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	uid := r.URL.Path[len("/"):]
+	ext := filepath.Ext(uid)
+	// serve static file
+	if len(uid) < 1 || ext != "" {
+		f := *hr.staticFileHandler
+		f.ServeHTTP(w, r)
+		return
+	}
+	// serve redirect
+	ref := r.Header.Get("REFERER")
+	if redirURL, err = hr.uu.GetURLByUID(uid, r.RemoteAddr, ref); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if redirURL == "" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	http.Redirect(w, r, redirURL, http.StatusSeeOther)
+	return
+
 }
 
 // /api/v1/url GET/POST
@@ -36,19 +72,14 @@ func (hr *HTTPResources) URLApiHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		uid := appendix[1:]
+		ref := r.Header.Get("REFERER")
 
-		if redirURL, err = hr.uu.GetURLByUID(uid); err != nil {
+		if redirURL, err = hr.uu.GetURLByUID(uid, r.RemoteAddr, ref); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if redirURL == "" {
 			http.Error(w, "Not found", http.StatusNotFound)
-			return
-		}
-
-		ref := r.Header.Get("REFERER")
-		if err = hr.uu.UpdateEncodedURLData(uid, r.RemoteAddr, ref); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
