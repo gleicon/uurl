@@ -17,6 +17,18 @@ func (w *stResponseWriter) WriteHeader(status int) {
 	w.ResponseWriter.WriteHeader(status)
 }
 
+func (w *stResponseWriter) Flush() {
+	z := w.ResponseWriter
+	if f, ok := z.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *stResponseWriter) CloseNotify() <-chan bool {
+	z := w.ResponseWriter
+	return z.(http.CloseNotifier).CloseNotify()
+}
+
 func (w *stResponseWriter) Write(b []byte) (int, error) {
 	if w.HTTPStatus == 0 {
 		w.HTTPStatus = 200
