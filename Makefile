@@ -12,6 +12,10 @@ deps:
 server:
 	go build -v -o $(NAME) -ldflags "-X main.VERSION=$(VERSION)"
 
+deploy:
+	$(FLAGS_LINUX_AMD64) go build -v -o $(NAME) -ldflags "-X main.VERSION=$(VERSION)"
+	file $(NAME)
+
 clean:
 	rm -f $(NAME)
 
